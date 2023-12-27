@@ -1,4 +1,4 @@
-import {Request} from 'express';
+import { Request } from 'express';
 import {
   AssemblyLinePart,
   MachineType,
@@ -7,22 +7,10 @@ import {
   WeldingRobotPart,
   partInfo,
 } from '../native-app/data/types';
-import {calculateMachineHealth} from './calculations';
+import { calculateMachineHealth } from './calculations';
+import PersistentData from './persistentData';
 
-export const getMachineHealth = (req: Request) => {
-  /* Assuming the request body contains the machine's name and parts data in the format of
-  {
-    "machines": {
-      "assemblyLine": {
-        "alignmentAccuracy": 0.5
-      },
-      "weldingRobot": {
-        "vibrationLevel": 4.0,
-        "electrodeWear": 0.8,
-      }
-    }
-  }
-  */
+export const getMachineHealth = async (req: Request) => {
   const {
     machines,
   }: {
@@ -39,12 +27,16 @@ export const getMachineHealth = (req: Request) => {
   } = req.body;
 
   if (!machines) {
-    return {error: 'Invalid input format'};
+    return { error: 'Invalid input format' };
   }
 
-  const machineScores: {
-    [key in MachineType]?: string;
-  } = {};
+  const machineData: {
+    machineName: MachineType;
+    partName: string;
+    partValue: string;
+    machineScore: number;
+  }[] = [];
+
   let factoryScore = 0;
   let machineCount = 0;
 
@@ -57,33 +49,57 @@ export const getMachineHealth = (req: Request) => {
       | QualityControlStationPart,
       string
     >;
-    const machineScore = calculateMachineHealth(
-      machineName as MachineType,
-      Object.keys(machine).reduce((parts: partInfo[], partName) => {
-        const partNameTyped = partName as
-          | WeldingRobotPart
-          | AssemblyLinePart
-          | PaintingStationPart
-          | QualityControlStationPart;
-        parts.push({
-          name: partNameTyped,
-          value: parseFloat(machine[partNameTyped]),
-        });
-        return parts;
-      }, []),
-    );
 
-    machineScores[machineName as MachineType] = machineScore.toFixed(2);
+    for (const partName in machine) {
+      const partNameTyped = partName as
+        | WeldingRobotPart
+        | AssemblyLinePart
+        | PaintingStationPart
+        | QualityControlStationPart;
 
-    factoryScore += machineScore;
+      const partValue = machine[partNameTyped];
+      const machineScore = calculateMachineHealth(machineName as MachineType, [
+        { name: partNameTyped, value: parseFloat(partValue) },
+      ]);
+
+      machineData.push({
+        machineName: machineName as MachineType,
+        partName: partNameTyped,
+        partValue,
+        machineScore: machineScore,
+      });
+
+      factoryScore += machineScore;
+    }
+
     machineCount++;
   }
 
   // Calculate the factory score (average of machine scores)
   factoryScore = machineCount > 0 ? factoryScore / machineCount : 0;
 
+  const userId = (req as any).user.userId;
+
+  // Store user data using the Mongoose model
+  try {
+    await PersistentData.create({
+      userId,
+      parameters: {
+        machineData, // Add the machineData property here
+        factoryScore,
+      },
+    });
+    console.log('Data persisted successfully:', machineData, factoryScore);
+  } catch (error) {
+    console.error('Error storing user data:', error);
+    // Handle the error appropriately
+  }
+
   return {
     factory: factoryScore.toFixed(2),
-    machineScores,
+    machineScores: machineData.reduce((acc, data) => {
+      acc[data.machineName] = data.machineScore;
+      return acc;
+    }, {} as Record<MachineType, number>),
   };
 };

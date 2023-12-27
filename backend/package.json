@@ -13,13 +13,21 @@
   "author": "BellSant",
   "dependencies": {
     "@netlify/functions": "^2.0.2",
-    "express": "^4.17.1",
+    "bcrypt": "^5.1.1",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
     "serverless-http": "^3.2.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.3.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/express": "^4.17.17",
     "@types/jest": "^29.5.4",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/mongoose": "^5.11.97",
     "@types/node": "^14.18.61",
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
